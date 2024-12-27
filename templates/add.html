@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Add New Employee</h2>
+<form method="POST">
+    <div class="mb-3">
+        <label for="name" class="form-label">Name</label>
+        <input type="text" class="form-control" id="name" name="name" placeholder="Enter full name" required>
+    </div>
+    <div class="mb-3">
+        <label for="email" class="form-label">Email</label>
+        <input type="email" class="form-control" id="email" name="email" placeholder="Enter email address" required>
+    </div>
+    <div class="mb-3">
+        <label for="department" class="form-label">Department</label>
+        <input type="text" class="form-control" id="department" name="department" placeholder="Enter department" required>
+    </div>
+    <div class="mb-3">
+        <label for="joining_date" class="form-label">Joining Date</label>
+        <input type="date" class="form-control" id="joining_date" name="joining_date" required>
+    </div>
+    <button type="submit" class="btn btn-primary">Add Employee</button>
+</form>
+{% endblock %}
