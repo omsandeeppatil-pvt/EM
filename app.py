@@ -1,45 +1,58 @@
 from flask import Flask, render_template, request, redirect, url_for, flash
-import pandas as pd
-import os
+import sqlite3
 from datetime import datetime
+import os
 
 app = Flask(__name__)
-app.secret_key = 'your_secret_key_here'  # Required for flash messages
-EXCEL_FILE = 'employees.xlsx'
+app.secret_key = 'your_secret_key_here'
 
-# Create Excel file if it doesn't exist
-if not os.path.exists(EXCEL_FILE):
-    df = pd.DataFrame(columns=['id', 'name', 'email', 'department', 'joining_date', 'status'])
-    df.to_excel(EXCEL_FILE, index=False)
+# Database initialization
+def init_db():
+    conn = sqlite3.connect('employees.db')
+    c = conn.cursor()
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS employees (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            email TEXT NOT NULL,
+            department TEXT NOT NULL,
+            joining_date TEXT NOT NULL,
+            status TEXT DEFAULT 'Active'
+        )
+    ''')
+    conn.commit()
+    conn.close()
 
-def load_employees():
-    return pd.read_excel(EXCEL_FILE)
+def get_db():
+    conn = sqlite3.connect('employees.db')
+    conn.row_factory = sqlite3.Row
+    return conn
 
-def save_employees(df):
-    df.to_excel(EXCEL_FILE, index=False)
+@app.before_first_request
+def setup():
+    init_db()
 
 @app.route('/')
 def index():
-    df = load_employees()
-    return render_template('index.html', employees=df.to_dict('records'))
+    conn = get_db()
+    employees = conn.execute('SELECT * FROM employees').fetchall()
+    conn.close()
+    return render_template('index.html', employees=employees)
 
 @app.route('/add', methods=['GET', 'POST'])
 def add_employee():
     if request.method == 'POST':
-        df = load_employees()
-        new_id = len(df) + 1
+        name = request.form['name']
+        email = request.form['email']
+        department = request.form['department']
+        joining_date = request.form['joining_date']
         
-        new_employee = {
-            'id': new_id,
-            'name': request.form['name'],
-            'email': request.form['email'],
-            'department': request.form['department'],
-            'joining_date': request.form['joining_date'],
-            'status': 'Active'
-        }
+        conn = get_db()
+        conn.execute('INSERT INTO employees (name, email, department, joining_date) VALUES (?, ?, ?, ?)',
+                    (name, email, department, joining_date))
+        conn.commit()
+        conn.close()
         
-        df = df.append(new_employee, ignore_index=True)
-        save_employees(df)
         flash('Employee added successfully!')
         return redirect(url_for('index'))
     
@@ -47,26 +60,32 @@ def add_employee():
 
 @app.route('/edit/<int:id>', methods=['GET', 'POST'])
 def edit_employee(id):
-    df = load_employees()
+    conn = get_db()
     if request.method == 'POST':
-        df.loc[df['id'] == id, 'name'] = request.form['name']
-        df.loc[df['id'] == id, 'email'] = request.form['email']
-        df.loc[df['id'] == id, 'department'] = request.form['department']
-        df.loc[df['id'] == id, 'joining_date'] = request.form['joining_date']
-        save_employees(df)
+        name = request.form['name']
+        email = request.form['email']
+        department = request.form['department']
+        joining_date = request.form['joining_date']
+        
+        conn.execute('UPDATE employees SET name=?, email=?, department=?, joining_date=? WHERE id=?',
+                    (name, email, department, joining_date, id))
+        conn.commit()
         flash('Employee updated successfully!')
         return redirect(url_for('index'))
     
-    employee = df[df['id'] == id].to_dict('records')[0]
+    employee = conn.execute('SELECT * FROM employees WHERE id=?', (id,)).fetchone()
+    conn.close()
     return render_template('edit.html', employee=employee)
 
 @app.route('/delete/<int:id>')
 def delete_employee(id):
-    df = load_employees()
-    df = df[df['id'] != id]
-    save_employees(df)
+    conn = get_db()
+    conn.execute('DELETE FROM employees WHERE id=?', (id,))
+    conn.commit()
+    conn.close()
     flash('Employee deleted successfully!')
     return redirect(url_for('index'))
 
 if __name__ == '__main__':
+    init_db()
     app.run(debug=True)
